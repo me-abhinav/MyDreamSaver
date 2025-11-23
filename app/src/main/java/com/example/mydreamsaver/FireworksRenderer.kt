@@ -132,7 +132,7 @@ class FireworksRenderer : GLSurfaceView.Renderer {
         cleanupAttributes()
     }
 
-    private fun setupAttributes(buffer: FloatBuffer, stride: Int) {
+    private fun setupAttributes(buffer: FloatBuffer, @Suppress("SameParameterValue") stride: Int) {
         // Position
         buffer.position(0)
         GLES30.glVertexAttribPointer(0, 4, GLES30.GL_FLOAT, false, stride, buffer)

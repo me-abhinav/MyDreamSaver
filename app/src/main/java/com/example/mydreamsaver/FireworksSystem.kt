@@ -112,8 +112,8 @@ class FireworksSystem {
         // Base Expansion Speed
         val baseExpansionSpeed = (1.8f + Random.nextFloat() * 1.2f) * sizeMod
 
-        for (i in 0 until particleCount) {
-            val spark = spawnParticle() ?: break
+        repeat(particleCount) {
+            val spark = spawnParticle() ?: return@repeat
 
             spark.active = true
             spark.isSpark = true
