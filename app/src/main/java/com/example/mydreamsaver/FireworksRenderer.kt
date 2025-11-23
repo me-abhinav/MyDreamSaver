@@ -110,12 +110,27 @@ class FireworksRenderer : GLSurfaceView.Renderer {
             tailBuffer.put(system.getTailBufferData(), 0, tailVertexCount * 9)
             tailBuffer.position(0)
 
-            // Set Line Mode
-            GLES30.glUniform1i(uIsLineHandle, 1) // true
+            // State Isolation Start
+            GLES30.glUniform1i(uIsLineHandle, 1) // Set Line Mode
 
-            setupAttributes(tailBuffer, stride)
-            GLES30.glLineWidth(3.0f) // Slightly thicker tail
+            // Explicitly ENABLE, POINT, and DISABLE attributes for TAILS
+            GLES30.glEnableVertexAttribArray(0)
+            GLES30.glEnableVertexAttribArray(1)
+
+            tailBuffer.position(0) // Position (Index 0, 4 floats)
+            GLES30.glVertexAttribPointer(0, 4, GLES30.GL_FLOAT, false, stride, tailBuffer)
+
+            tailBuffer.position(4) // Color (Index 1, 4 floats)
+            GLES30.glVertexAttribPointer(1, 4, GLES30.GL_FLOAT, false, stride, tailBuffer)
+
+            // a_Size (Index 2) is not strictly needed for lines, but disable it to be safe
+
+            GLES30.glLineWidth(3.0f)
             GLES30.glDrawArrays(GLES30.GL_LINES, 0, tailVertexCount)
+
+            // State Isolation End: Disable immediately after use
+            GLES30.glDisableVertexAttribArray(0)
+            GLES30.glDisableVertexAttribArray(1)
         }
 
         // --- DRAW HEADS (GL_POINTS) Second ---
@@ -123,33 +138,26 @@ class FireworksRenderer : GLSurfaceView.Renderer {
         vertexBuffer.put(system.getBufferData(), 0, particleCount * 9)
         vertexBuffer.position(0)
 
-        // Set Point Mode
-        GLES30.glUniform1i(uIsLineHandle, 0) // false
+        // State Isolation Start
+        GLES30.glUniform1i(uIsLineHandle, 0) // Set Point Mode (Round geometry in shader)
 
-        setupAttributes(vertexBuffer, stride)
+        // Explicitly ENABLE, POINT, and DISABLE attributes for HEADS
+        GLES30.glEnableVertexAttribArray(0)
+        GLES30.glEnableVertexAttribArray(1)
+        GLES30.glEnableVertexAttribArray(2)
+
+        vertexBuffer.position(0) // Position (Index 0, 4 floats)
+        GLES30.glVertexAttribPointer(0, 4, GLES30.GL_FLOAT, false, stride, vertexBuffer)
+
+        vertexBuffer.position(4) // Color (Index 1, 4 floats)
+        GLES30.glVertexAttribPointer(1, 4, GLES30.GL_FLOAT, false, stride, vertexBuffer)
+
+        vertexBuffer.position(8) // Size (Index 2, 1 float)
+        GLES30.glVertexAttribPointer(2, 1, GLES30.GL_FLOAT, false, stride, vertexBuffer)
+
         GLES30.glDrawArrays(GLES30.GL_POINTS, 0, particleCount)
 
-        cleanupAttributes()
-    }
-
-    private fun setupAttributes(buffer: FloatBuffer, @Suppress("SameParameterValue") stride: Int) {
-        // Position
-        buffer.position(0)
-        GLES30.glVertexAttribPointer(0, 4, GLES30.GL_FLOAT, false, stride, buffer)
-        GLES30.glEnableVertexAttribArray(0)
-
-        // Color
-        buffer.position(4)
-        GLES30.glVertexAttribPointer(1, 4, GLES30.GL_FLOAT, false, stride, buffer)
-        GLES30.glEnableVertexAttribArray(1)
-
-        // Size
-        buffer.position(8)
-        GLES30.glVertexAttribPointer(2, 1, GLES30.GL_FLOAT, false, stride, buffer)
-        GLES30.glEnableVertexAttribArray(2)
-    }
-
-    private fun cleanupAttributes() {
+        // State Isolation End: Disable immediately after use
         GLES30.glDisableVertexAttribArray(0)
         GLES30.glDisableVertexAttribArray(1)
         GLES30.glDisableVertexAttribArray(2)
