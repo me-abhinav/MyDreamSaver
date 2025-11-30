@@ -2,6 +2,7 @@ package com.example.mydreamsaver
 
 import android.content.Context
 import android.opengl.GLSurfaceView
+import android.view.WindowManager
 
 class FireworksView(context: Context) : GLSurfaceView(context) {
 
@@ -23,5 +24,15 @@ class FireworksView(context: Context) : GLSurfaceView(context) {
         // For a particle system, we usually switch this to CONTINUOUSLY later,
         // but keep it dirty for now until we add the loop.
         renderMode = RENDERMODE_CONTINUOUSLY
+
+        // Use WindowMetrics for API 30+ (Native 4K support) ---
+        val windowManager = context.getSystemService(Context.WINDOW_SERVICE)
+                as WindowManager
+        val metrics = windowManager.currentWindowMetrics
+        val bounds = metrics.bounds
+
+        // Force the surface to the full physical resolution
+        // This bypasses Android TV's 1080p UI scaling
+        holder.setFixedSize(bounds.width(), bounds.height())
     }
 }

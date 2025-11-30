@@ -11,14 +11,13 @@ class FireworksSystem {
     // Buffer for Heads (GL_POINTS)
     private val renderBuffer = FloatArray(Config.MAX_PARTICLES * 9)
 
-    // NEW: Buffer for Tails (GL_LINES)
-    // 2 vertices per tail * 9 floats per vertex * Max Particles
-    private val tailBuffer = FloatArray(Config.MAX_PARTICLES * 2 * 9)
+    // Buffer for Tails (GL_TRIANGLES)
+    private val tailBuffer = FloatArray(Config.MAX_PARTICLES * 6 * 9)
 
     var activeParticleCount = 0
-    var activeTailVertexCount = 0 // Tracks how many vertices (not lines) are in the buffer
+    var activeTailVertexCount = 0
 
-    // ... (Choreography variables remain the same) ...
+    // --- Choreography Variables ---
     private val shooters = FloatArray(6)
     private val shooterColors =  Array(6) { OledPalette[0] }
     private val shooterStateTimer = IntArray(6)
@@ -28,7 +27,6 @@ class FireworksSystem {
     private var volleyTimer = 0
     private var currentVolleyShots = 12
 
-    // ... (spawnParticle and processChoreography remain the same) ...
     private fun spawnParticle(): Particle? {
         return particles.firstOrNull { !it.active }
     }
@@ -39,8 +37,6 @@ class FireworksSystem {
     }
 
     private fun processChoreography() {
-        // ... (Keep your existing Choreography logic here) ...
-        // Copy-paste the logic from the previous step if you replaced the file
         if (volleyState == "setup") {
             val margin = Config.VIRTUAL_WIDTH * 0.15f
             val width = Config.VIRTUAL_WIDTH - (margin * 2)
@@ -77,14 +73,16 @@ class FireworksSystem {
         }
     }
 
-    // ... (launchRocket and explode remain the same) ...
     private fun launchRocket(shooterIndex: Int) {
         val p = spawnParticle() ?: return
         p.active = true; p.isSpark = false
         p.x = shooters[shooterIndex]; p.y = Config.VIRTUAL_HEIGHT
         val color = shooterColors[shooterIndex]
         p.r = color.r; p.g = color.g; p.b = color.b
-        p.size = 18f
+
+        // Rocket size (Small)
+        p.size = 8f
+
         val targetY = (Config.VIRTUAL_HEIGHT * 0.1f) + (Random.nextFloat() * Config.VIRTUAL_HEIGHT * 0.3f)
         p.targetY = targetY
         val divergence = (Random.nextFloat() * 80f - 40f)
@@ -98,23 +96,16 @@ class FireworksSystem {
     }
 
     private fun explode(parent: Particle) {
-        // Size Modifier (Big explosions logic from previous step)
         val sizeMod = 0.8f + (Random.nextFloat() * 2.0f)
-
         var densityMod = 1.0f
         val densityRoll = Random.nextFloat()
         if (densityRoll < 0.3f) densityMod = 0.4f
         else if (densityRoll > 0.7f) densityMod = 1.6f
-
-        // Cap particle count for performance
         val particleCount = ((100 + Random.nextInt(80)) * sizeMod * densityMod).toInt().coerceAtMost(400)
-
-        // Base Expansion Speed
         val baseExpansionSpeed = (1.8f + Random.nextFloat() * 1.2f) * sizeMod
 
         repeat(particleCount) {
             val spark = spawnParticle() ?: return@repeat
-
             spark.active = true
             spark.isSpark = true
             spark.x = parent.x
@@ -122,24 +113,16 @@ class FireworksSystem {
             spark.r = parent.r
             spark.g = parent.g
             spark.b = parent.b
-            spark.size = 12f
+            spark.size = 12f // Base size
 
-            // Direction Calculation
             val theta = Random.nextFloat() * PI.toFloat() * 2f
             val phi = acos(Random.nextFloat() * 2f - 1f)
-
             val xDir = sin(phi) * cos(theta)
             val yDir = sin(phi) * sin(theta)
-
-            // NEW LOGIC: Irregularity
-            // Instead of uniform speed, we vary each particle by +/- 25%
-            // This breaks the "Perfect Circle" look.
-            val irregularity = 0.95f + (Random.nextFloat() * 0.1f) // 0.95 to 1.05
+            val irregularity = 0.95f + (Random.nextFloat() * 0.1f)
             val finalSpeed = baseExpansionSpeed * irregularity
-
             spark.vx = xDir * finalSpeed
             spark.vy = yDir * finalSpeed
-
             spark.baseDecay = Random.nextFloat() * 0.004f + 0.002f
             spark.decay = spark.baseDecay
         }
@@ -155,43 +138,20 @@ class FireworksSystem {
         for (p in particles) {
             if (!p.active) continue
 
-            // --- Physics Update ---
+            // --- 1. Physics Update ---
             if (p.isSpark) {
                 p.vx *= Config.DRAG_SPARK
                 p.vy *= Config.DRAG_SPARK
                 p.vy += Config.GRAVITY_SPARK
-
                 p.age++
+
                 if (p.age > 45) p.decay *= 1.03f
                 p.alpha -= p.decay
+
+                // Update size based on alpha (shrinking effect)
+                p.size = 12f * p.alpha.coerceAtLeast(0f)
+
                 if (p.alpha <= 0) { p.reset(); continue }
-
-                // --- TAIL LOGIC (Sparks only) ---
-                // CHANGE 1: Increase multiplier from 4.0f to 40.0f
-                // Because velocity is low (slow motion), we need a huge multiplier
-                // to make the tail visible from behind the large particle head.
-                val tailX = p.x - p.vx * 6.0f
-                val tailY = p.y - p.vy * 6.0f
-
-                val ndcHeadX = (p.x / Config.VIRTUAL_WIDTH) * 2f - 1f
-                val ndcHeadY = 1f - (p.y / Config.VIRTUAL_HEIGHT) * 2f
-                val ndcTailX = (tailX / Config.VIRTUAL_WIDTH) * 2f - 1f
-                val ndcTailY = 1f - (tailY / Config.VIRTUAL_HEIGHT) * 2f
-
-                // Vertex 1: Head of Tail
-                tailBuffer[tailIdx++] = ndcHeadX; tailBuffer[tailIdx++] = ndcHeadY
-                tailBuffer[tailIdx++] = 0f; tailBuffer[tailIdx++] = 1f
-                // CHANGE 2: Increase Alpha from 0.6f to 1.0f for visibility
-                tailBuffer[tailIdx++] = p.r; tailBuffer[tailIdx++] = p.g; tailBuffer[tailIdx++] = p.b; tailBuffer[tailIdx++] = p.alpha * 1.0f
-                tailBuffer[tailIdx++] = 0f
-
-                // Vertex 2: End of Tail
-                tailBuffer[tailIdx++] = ndcTailX; tailBuffer[tailIdx++] = ndcTailY
-                tailBuffer[tailIdx++] = 0f; tailBuffer[tailIdx++] = 1f
-                tailBuffer[tailIdx++] = p.r; tailBuffer[tailIdx++] = p.g; tailBuffer[tailIdx++] = p.b; tailBuffer[tailIdx++] = 0f
-                tailBuffer[tailIdx++] = 0f
-
-                activeTailVertexCount += 2
 
             } else {
                 // Rocket Logic
@@ -201,6 +161,7 @@ class FireworksSystem {
                 p.vx *= Config.DRAG_ROCKET
                 p.vy *= Config.DRAG_ROCKET
                 p.vy -= Config.GRAVITY_ROCKET * 0.5f
+
                 if ((p.vy > -0.5f || p.y <= p.targetY) && !p.exploded) {
                     p.exploded = true
                     explode(p)
@@ -208,10 +169,72 @@ class FireworksSystem {
                 }
             }
 
+            // --- 2. Position Integration ---
             p.x += p.vx
             p.y += p.vy
 
-            // --- Fill Point Buffer ---
+            // --- 3. Tail Logic ---
+
+            // Calculate halfWidth proportional to the current particle size.
+            // 0.25f ensures the tail width is 50% of the full particle diameter (including glow),
+            // which lines up nicely with the solid core.
+            val halfWidth = p.size * 0.25f
+
+            val headX = p.x
+            val headY = p.y
+            val tailX = headX - p.vx * 6.0f
+            val tailY = headY - p.vy * 6.0f
+
+            var dx = headX - tailX
+            var dy = headY - tailY
+            val len = sqrt(dx*dx + dy*dy)
+
+            if (len > 0.1f) {
+                dx /= len
+                dy /= len
+
+                // Tapered Ribbon Logic (Head has width, Tail has 0 width)
+                val pxHead = -dy * halfWidth
+                val pyHead = dx * halfWidth
+
+                val pxTail = 0f
+                val pyTail = 0f
+
+                val x1 = headX + pxHead; val y1 = headY + pyHead
+                val x2 = headX - pxHead; val y2 = headY - pyHead
+                val x3 = tailX + pxTail; val y3 = tailY + pyTail
+                val x4 = tailX - pxTail; val y4 = tailY - pyTail
+
+                val ndcX1 = (x1 / Config.VIRTUAL_WIDTH) * 2f - 1f
+                val ndcY1 = 1f - (y1 / Config.VIRTUAL_HEIGHT) * 2f
+                val ndcX2 = (x2 / Config.VIRTUAL_WIDTH) * 2f - 1f
+                val ndcY2 = 1f - (y2 / Config.VIRTUAL_HEIGHT) * 2f
+                val ndcX3 = (x3 / Config.VIRTUAL_WIDTH) * 2f - 1f
+                val ndcY3 = 1f - (y3 / Config.VIRTUAL_HEIGHT) * 2f
+                val ndcX4 = (x4 / Config.VIRTUAL_WIDTH) * 2f - 1f
+                val ndcY4 = 1f - (y4 / Config.VIRTUAL_HEIGHT) * 2f
+
+                val r = p.r; val g = p.g; val b = p.b; val aHead = p.alpha; val aTail = 0f
+
+                // Push Triangles
+                tailBuffer[tailIdx++] = ndcX1; tailBuffer[tailIdx++] = ndcY1; tailBuffer[tailIdx++] = 0f; tailBuffer[tailIdx++] = 1f
+                tailBuffer[tailIdx++] = r; tailBuffer[tailIdx++] = g; tailBuffer[tailIdx++] = b; tailBuffer[tailIdx++] = aHead; tailBuffer[tailIdx++] = 0f
+                tailBuffer[tailIdx++] = ndcX2; tailBuffer[tailIdx++] = ndcY2; tailBuffer[tailIdx++] = 0f; tailBuffer[tailIdx++] = 1f
+                tailBuffer[tailIdx++] = r; tailBuffer[tailIdx++] = g; tailBuffer[tailIdx++] = b; tailBuffer[tailIdx++] = aHead; tailBuffer[tailIdx++] = 0f
+                tailBuffer[tailIdx++] = ndcX3; tailBuffer[tailIdx++] = ndcY3; tailBuffer[tailIdx++] = 0f; tailBuffer[tailIdx++] = 1f
+                tailBuffer[tailIdx++] = r; tailBuffer[tailIdx++] = g; tailBuffer[tailIdx++] = b; tailBuffer[tailIdx++] = aTail; tailBuffer[tailIdx++] = 0f
+
+                tailBuffer[tailIdx++] = ndcX2; tailBuffer[tailIdx++] = ndcY2; tailBuffer[tailIdx++] = 0f; tailBuffer[tailIdx++] = 1f
+                tailBuffer[tailIdx++] = r; tailBuffer[tailIdx++] = g; tailBuffer[tailIdx++] = b; tailBuffer[tailIdx++] = aHead; tailBuffer[tailIdx++] = 0f
+                tailBuffer[tailIdx++] = ndcX4; tailBuffer[tailIdx++] = ndcY4; tailBuffer[tailIdx++] = 0f; tailBuffer[tailIdx++] = 1f
+                tailBuffer[tailIdx++] = r; tailBuffer[tailIdx++] = g; tailBuffer[tailIdx++] = b; tailBuffer[tailIdx++] = aTail; tailBuffer[tailIdx++] = 0f
+                tailBuffer[tailIdx++] = ndcX3; tailBuffer[tailIdx++] = ndcY3; tailBuffer[tailIdx++] = 0f; tailBuffer[tailIdx++] = 1f
+                tailBuffer[tailIdx++] = r; tailBuffer[tailIdx++] = g; tailBuffer[tailIdx++] = b; tailBuffer[tailIdx++] = aTail; tailBuffer[tailIdx++] = 0f
+
+                activeTailVertexCount += 6
+            }
+
+            // --- 4. Render Buffer (Heads) ---
             val ndcX = (p.x / Config.VIRTUAL_WIDTH) * 2f - 1f
             val ndcY = 1f - (p.y / Config.VIRTUAL_HEIGHT) * 2f
 
@@ -226,8 +249,6 @@ class FireworksSystem {
 
     fun getBufferData(): FloatArray = renderBuffer
     fun getParticleCount(): Int = activeParticleCount
-
-    // New Getters for Tail
     fun getTailBufferData(): FloatArray = tailBuffer
     fun getTailVertexCount(): Int = activeTailVertexCount
 }
