@@ -175,15 +175,18 @@ class FireworksSystem {
 
             // --- 3. Tail Logic ---
 
-            // Calculate halfWidth proportional to the current particle size.
-            // 0.25f ensures the tail width is 50% of the full particle diameter (including glow),
-            // which lines up nicely with the solid core.
-            val halfWidth = p.size * 0.25f
+            // Thinner tails for Rockets
+            val widthMult = if (p.isSpark) 0.25f else 0.15f
+            val halfWidth = p.size * widthMult
+
+            // Shorter tails for Rockets
+            // Rockets get a 3.0f length multiplier, Sparks keep 6.0f
+            val lengthMult = if (p.isSpark) 6.0f else 3.0f
 
             val headX = p.x
             val headY = p.y
-            val tailX = headX - p.vx * 6.0f
-            val tailY = headY - p.vy * 6.0f
+            val tailX = headX - p.vx * lengthMult
+            val tailY = headY - p.vy * lengthMult
 
             var dx = headX - tailX
             var dy = headY - tailY

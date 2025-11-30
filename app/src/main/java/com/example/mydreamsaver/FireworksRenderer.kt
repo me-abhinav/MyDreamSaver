@@ -15,7 +15,6 @@ class FireworksRenderer : GLSurfaceView.Renderer {
     private lateinit var vertexBuffer: FloatBuffer
     private lateinit var tailBuffer: FloatBuffer
 
-    // Added u_ScaleFactor to scale points based on screen resolution
     private val vertexShaderCode = """
         #version 300 es
         layout(location = 0) in vec4 a_Position; 
@@ -71,10 +70,10 @@ class FireworksRenderer : GLSurfaceView.Renderer {
     private var programId: Int = 0
     private var uBrightnessCapHandle: Int = 0
     private var uIsLineHandle: Int = 0
-    private var uScaleFactorHandle: Int = 0 // NEW Handle
+    private var uScaleFactorHandle: Int = 0
 
     var brightnessCap: Float = 1.0f
-    private var scaleFactor: Float = 1.0f // NEW Variable
+    private var scaleFactor: Float = 1.0f
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
@@ -106,7 +105,7 @@ class FireworksRenderer : GLSurfaceView.Renderer {
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
 
-        // 1. Update Physics
+        // Update Physics
         system.update()
         val particleCount = system.getParticleCount()
         val tailVertexCount = system.getTailVertexCount()
